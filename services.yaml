@@ -47,6 +47,7 @@ apps:
     type: product
     platform_wired: true
     runtime: docker
+    database_driver: postgresql
     repo: praam-knowledge-studio
     env_dir: .
     ui: 3001

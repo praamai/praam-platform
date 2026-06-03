@@ -110,7 +110,10 @@ def render_env_lines(app_key: str, app: dict, services: dict) -> list[str]:
 
     deps = app.get("dependencies") or []
     if "postgres" in deps and schema:
-        lines.append(f"DATABASE_URL={database_url(runtime=runtime, platform=platform, schema=schema)}")
+        driver = app.get("database_driver", "postgresql+psycopg")
+        lines.append(
+            f"DATABASE_URL={database_url(runtime=runtime, platform=platform, schema=schema, driver=driver)}"
+        )
         lines.append(
             f"POSTGRES_HOST={host_for_runtime(runtime, platform['postgres']['container_host'])}"
         )
