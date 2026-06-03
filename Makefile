@@ -1,10 +1,12 @@
 # praam-platform — shared local dev infrastructure
-# Usage: make up | make wait | make render-env | make doctor | make verify-schema
+# Usage: make          → start stack, render env, verify schemas
+#         make help    → list targets
+#         make down    → stop platform services
 
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := up
 
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 COMPOSE ?= docker compose
@@ -21,8 +23,21 @@ help: ## Show targets
 	@echo ""
 	@grep -E '^[a-zA-Z0-9_-]+:.*?##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?##"} {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start postgres, redis, litellm on praam-network
+up: ## Start stack, render env for all apps, verify schemas
 	@$(COMPOSE) up -d
+	@$(MAKE) wait
+	@$(MAKE) render-env-all
+	@$(MAKE) verify-schema
+	@echo ""
+	@echo "  praam-platform is up."
+	@echo "  Postgres  → 127.0.0.1:15430 (praam_dev)"
+	@echo "  Redis     → 127.0.0.1:16380"
+	@echo "  LiteLLM   → http://127.0.0.1:3100/v1"
+	@echo ""
+	@echo "  Next: cd ../findoc-ai && make dev"
+	@echo "  Suite: cd ../praam-demo-hub && make all"
+	@echo "  Stop:  make down"
+	@echo ""
 
 down: ## Stop platform services
 	@$(COMPOSE) down
@@ -33,9 +48,12 @@ wait: ## Wait until postgres, redis, and litellm are healthy
 doctor: ## Compare rendered env + check platform health
 	@bash "$(ROOT)/scripts/$(PRAAM_PLATFORM_API)/doctor.sh"
 
-render-env: ## Render one app: make render-env APP=findoc-ai
-	@test -n "$(APP)" || { echo "Usage: make render-env APP=findoc-ai"; exit 1; }
+render-env: ## Render .env.platform.generated (all apps; optional APP=findoc-ai)
+ifneq ($(strip $(APP)),)
 	@bash "$(ROOT)/scripts/$(PRAAM_PLATFORM_API)/render-env.sh" "$(APP)"
+else
+	@$(MAKE) render-env-all
+endif
 
 render-env-all: ## Render .env.platform.generated for every app in services.yaml
 	@bash "$(ROOT)/scripts/$(PRAAM_PLATFORM_API)/render-env.sh" --all

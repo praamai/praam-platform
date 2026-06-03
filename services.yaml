@@ -136,4 +136,5 @@ apps:
     repo: praam-demo-hub
     env_dir: .
     ui: 3000
+    embed_host: 127.0.0.1
     dependencies: []

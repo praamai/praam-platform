@@ -10,7 +10,7 @@ Init SQL lives in `infra/postgres/init/01-schemas.sql` — never add app tables 
 | Schema | App repo | Status |
 |--------|----------|--------|
 | `findoc` | findoc-ai | Done — SQLAlchemy `create_all` + search_path |
-| `knowledge_studio` | praam-knowledge-studio | Done — `make db-init` applies `schema.sql` to platform schema |
+| `knowledge_studio` | praam-knowledge-studio | Done — `make db-init` applies `schema.sql`; `make migrate-legacy-users` copies accounts from legacy `:15431` |
 | `prism` | prism | Pending |
 | `askhr` | askHR | Pending |
 | `plan_copilot` | production-plan-copilot | Pending |
@@ -37,13 +37,13 @@ Init SQL lives in `infra/postgres/init/01-schemas.sql` — never add app tables 
 Host-run apps use localhost ports from `services.yaml`:
 
 ```text
-postgresql+psycopg://praam:praam_dev@127.0.0.1:15430/praam_dev?options=-csearch_path%3Dfindoc
+postgresql+psycopg://praam:praam_dev@127.0.0.1:15430/praam_dev?options=-csearch_path%3Dfindoc%2Cpublic
 ```
 
 Container-run apps use Docker DNS on `praam-network`:
 
 ```text
-postgresql://praam:praam_dev@postgres:5432/praam_dev?options=-csearch_path%3Dknowledge_studio
+postgresql://praam:praam_dev@postgres:5432/praam_dev?options=-csearch_path%3Dknowledge_studio%2Cpublic
 ```
 
 ## Verify

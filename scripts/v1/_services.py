@@ -69,7 +69,8 @@ def database_url(
     user = pg.get("user", "praam")
     password = pg.get("password", "praam_dev")
     database = pg["database"]
-    options = quote(f"-csearch_path={schema}", safe="")
+    # Include public so pgvector operators/types resolve (extension lives in public).
+    options = quote(f"-csearch_path={schema},public", safe="")
     return f"{driver}://{user}:{password}@{host}:{port}/{database}?options={options}"
 
 
@@ -148,6 +149,17 @@ def render_env_lines(app_key: str, app: dict, services: dict) -> list[str]:
         for alias in ("fast", "reasoning", "embedding"):
             if alias in models:
                 lines.append(f"PRAAM_LLM_MODEL_{alias.upper()}={alias}")
+
+    if app_key == "demo-hub":
+        embed_host = app.get("embed_host", "127.0.0.1")
+        for other_key, other in sorted((services.get("apps") or {}).items()):
+            if other_key == "demo-hub":
+                continue
+            ui_port = other.get("ui")
+            if ui_port is None:
+                continue
+            env_name = f"APP_URL_{other_key.replace('-', '_').upper()}"
+            lines.append(f"{env_name}=http://{embed_host}:{ui_port}")
 
     return lines
 
