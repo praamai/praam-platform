@@ -1,0 +1,138 @@
+version: 1
+
+platform:
+  postgres:
+    host_port: 15430
+    container_port: 5432
+    container_host: postgres
+    database: praam_dev
+    user: praam
+    password: praam_dev
+  redis:
+    host_port: 16380
+    container_port: 6379
+    container_host: redis
+  litellm:
+    host_port: 3100
+    container_port: 4000
+    container_host: litellm
+    path: /v1
+    models:
+      fast: gpt-4o-mini
+      reasoning: gpt-4o
+      embedding: text-embedding-3-large
+    providers:
+      default: openai
+
+apps:
+  findoc-ai:
+    type: product
+    platform_wired: true
+    runtime: host
+    repo: findoc-ai
+    env_dir: backend
+    ui: 3003
+    api: 3013
+    schema: findoc
+    health:
+      api: /health
+    dependencies:
+      - postgres
+      - redis
+      - litellm
+    redis:
+      cache: 2
+
+  knowledge-studio:
+    type: product
+    platform_wired: true
+    runtime: docker
+    repo: praam-knowledge-studio
+    env_dir: .
+    ui: 3001
+    api: 3011
+    port_env:
+      PROPOSAL_CORE_PORT: api
+      PROPOSAL_UI_PORT: ui
+    schema: knowledge_studio
+    health:
+      api: /health
+    dependencies:
+      - postgres
+      - redis
+      - litellm
+    redis:
+      cache: 0
+      celery: 1
+
+  prism:
+    type: product
+    runtime: docker
+    repo: prism
+    env_dir: .
+    ui: 3004
+    api: 3014
+    schema: prism
+    health:
+      api: /health
+    dependencies:
+      - postgres
+      - redis
+      - litellm
+    redis:
+      cache: 3
+      celery: 4
+      results: 5
+
+  askhr:
+    type: product
+    runtime: docker
+    repo: askHR
+    env_dir: .
+    ui: 3005
+    api: 3015
+    schema: askhr
+    health:
+      api: /health
+    dependencies:
+      - postgres
+      - redis
+      - litellm
+    redis:
+      cache: 6
+      celery: 7
+
+  production-plan-copilot:
+    type: product
+    runtime: host
+    repo: production-plan-copilot
+    env_dir: backend
+    ui: 3006
+    api: 3016
+    schema: plan_copilot
+    health:
+      api: /health
+    dependencies:
+      - postgres
+      - litellm
+
+  praam-pulse:
+    type: product
+    runtime: docker
+    repo: praam-pulse
+    env_dir: config
+    api: 3007
+    realtime: 3027
+    schema: pulse
+    health:
+      api: /v1/health/live
+    dependencies:
+      - postgres
+
+  demo-hub:
+    type: shell
+    runtime: docker
+    repo: praam-demo-hub
+    env_dir: .
+    ui: 3000
+    dependencies: []
