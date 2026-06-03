@@ -42,6 +42,8 @@ services:
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-praam-litellm-dev}
     env_file:
+      - path: .env
+        required: false
       - path: ${PRAAM_SECRETS_FILE:-${HOME}/.praam/secrets.env}
         required: false
     volumes:

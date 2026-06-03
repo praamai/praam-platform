@@ -145,6 +145,7 @@ def render_env_lines(app_key: str, app: dict, services: dict) -> list[str]:
         base = litellm_base_url(runtime=runtime, platform=platform)
         lines.append(f"LITELLM_BASE_URL={base}")
         lines.append(f"OPENAI_API_BASE={base}")
+        lines.append("LITELLM_MASTER_KEY=praam-litellm-dev")
         models = platform["litellm"].get("models") or {}
         for alias in ("fast", "reasoning", "embedding"):
             if alias in models:

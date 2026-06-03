@@ -12,7 +12,7 @@ Init SQL lives in `infra/postgres/init/01-schemas.sql` — never add app tables 
 | `findoc` | findoc-ai | Done — SQLAlchemy `create_all` + search_path |
 | `knowledge_studio` | praam-knowledge-studio | Done — `make db-init` applies `schema.sql`; `make migrate-legacy-users` copies accounts from legacy `:15431` |
 | `prism` | prism | Pending |
-| `askhr` | askHR | Pending |
+| `askhr` | askHR | Done — platform compose + `render-env`; tables via API `init_db()` |
 | `plan_copilot` | production-plan-copilot | Pending |
 | `pulse` | praam-pulse | Pending |
 

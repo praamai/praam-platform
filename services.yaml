@@ -87,11 +87,15 @@ apps:
 
   askhr:
     type: product
+    platform_wired: true
     runtime: docker
     repo: askHR
     env_dir: .
     ui: 3005
     api: 3015
+    port_env:
+      ASKHR_API_PORT: api
+      CHAT_UI_PORT: ui
     schema: askhr
     health:
       api: /health
