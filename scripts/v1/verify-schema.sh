@@ -7,7 +7,7 @@ COMPOSE="${COMPOSE:-docker compose -f $ROOT/docker-compose.yml}"
 PY="${ROOT}/scripts/v1/_services.py"
 
 if ! python3 -c "import yaml" >/dev/null 2>&1; then
-  echo "ERROR: PyYAML not installed. Run: python3 -m pip install pyyaml"
+  echo "ERROR: PyYAML not installed. Run: make install-dev  (or: uv sync --all-extras)"
   exit 1
 fi
 

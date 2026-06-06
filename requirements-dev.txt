@@ -1,2 +1,0 @@
-# Scripts (render-env, doctor) require PyYAML
-pyyaml>=6.0

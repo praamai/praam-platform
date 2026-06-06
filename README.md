@@ -1,148 +1,127 @@
 # praam-platform
 
-Shared **local development platform** for the [Praam](https://github.com/orgs/praamai) product suite — one Postgres, one Redis, one LiteLLM gateway, and a single registry (`services.yaml`) instead of duplicating infra in every repo.
+Shared **local dev platform** for the [Praam](https://github.com/orgs/praamai) suite — one Postgres, Redis, LiteLLM gateway, and a config API instead of duplicating infra in every repo.
 
-**Version:** see [VERSION](VERSION)
+**Version 1.1.0** · dev-only (prod → RDS, ElastiCache, managed AI gateway)
 
-## What is this?
+## What it does
 
-When you run six demos locally, you do not want six Postgres containers, six Redis instances, and six copies of `OPENAI_API_KEY` in `.env` files. **praam-platform** is the shared layer:
+- **Infra** — Postgres `praam_dev` (schema per app), Redis, LiteLLM on `praam-network`
+- **Config plane** — `services.yaml` + **platform-config API** (`:3180`) serve DB URLs, Redis, LiteLLM, ports at runtime
+- **Secrets** — provider keys in **`~/.praam/secrets.env` only** (LiteLLM + secrets API)
+- **SDK** — `PlatformClient("app-key").load()` in `lib/praam_platform/`
 
-```text
-Application layer          Platform layer (this repo)
-─────────────────          ──────────────────────────
-praam-demo-hub             PostgreSQL  praam_dev + per-app schemas
-praam-knowledge-studio  →  Redis       logical DB indexes per app
-findoc-ai                  LiteLLM     provider keys in ~/.praam/secrets.env
-prism, askHR, …            praam-network
+Not in this repo: app tables (Alembic in product repos), business logic, human login ([praam-pulse](https://github.com/praamai/praam-pulse)).
+
+```mermaid
+flowchart LR
+  subgraph apps [Suite apps]
+    A[findoc-ai · knowledge-studio · askHR · …]
+  end
+  subgraph platform [praam-platform]
+    API[platform-config :3180]
+    PG[(Postgres praam_dev)]
+    RD[(Redis)]
+    LLM[LiteLLM :3100]
+    YAML[services.yaml]
+  end
+  SEC[~/.praam/secrets.env]
+  A -->|2 bootstrap vars| API
+  API --> YAML
+  API --> PG
+  API --> RD
+  API --> LLM
+  SEC --> LLM
+  SEC --> API
+  A --> PG
+  A --> RD
+  A --> LLM
 ```
-
-Production uses managed RDS, ElastiCache, and a real AI gateway — **this repo is dev-only.**
-
-## How it works
-
-### 1. Start platform
-
-```bash
-make    # up + wait + render-env-all + verify-schema
-```
-
-Starts three containers on **`praam-network`**:
-
-| Service | Host port | In-container hostname |
-|---------|-----------|------------------------|
-| Postgres (pgvector) | 15430 | `postgres:5432` |
-| Redis | 16380 | `redis:6379` |
-| LiteLLM | 3100 → 4000 | `litellm:4000` |
-
-Database **`praam_dev`** holds **schemas** (not separate databases): `findoc`, `knowledge_studio`, `prism`, `askhr`, `plan_copilot`, `pulse`.
-
-### 2. Render app environment
-
-```bash
-make render-env APP=findoc-ai
-# writes ../findoc-ai/backend/.env.platform.generated
-```
-
-[`services.yaml`](services.yaml) is the single source of truth for ports, `runtime: host|docker`, Redis roles (`cache`, `celery`), and health paths. Scripts never edit your private `.env` — only generate `.env.platform.generated`.
-
-Apps load:
-
-```text
-.env  →  .env.platform.generated  (later wins)
-```
-
-### 3. Product repo starts
-
-Each wired app includes `make/v1/platform.mk`:
-
-```makefile
-PRAAM_USE_PLATFORM ?= 1
--include $(PRAAM_PLATFORM_ROOT)/make/v1/platform.mk
-```
-
-Typical flow:
-
-```text
-make up  →  platform-ensure  →  platform-wait  →  render-env  →  up-app
-```
-
-- **Docker apps** (e.g. knowledge-studio) talk to `postgres`, `redis`, `litellm` on `praam-network`.
-- **Host apps** (e.g. findoc API) use `127.0.0.1:15430`, `127.0.0.1:16380`, `127.0.0.1:3100`.
-
-### 4. Full suite from demo hub
-
-```bash
-cd ../praam-demo-hub && make all
-```
-
-The hub runs platform first, then each sibling `make up`, then the showcase on :3000.
 
 ## Quick start
 
+Requires [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`).
+
 ```bash
-python3 -m pip install -r requirements-dev.txt
-cp .env.secrets.example ~/.praam/secrets.env   # provider keys for LiteLLM
-
-make
-make doctor
+make bootstrap          # ~/.praam/secrets.env + uv sync (.venv)
+# add OPENAI_API_KEY etc. to ~/.praam/secrets.env  (see .env.example)
+make                    # up + verify + config smoke
+make doctor DOCTOR_FLAGS=--platform-only
 ```
 
-| Command | Action |
-|---------|--------|
-| `make` / `make up` | Start postgres, redis, litellm |
-| `make wait` | Wait until all services healthy |
-| `make render-env APP=<key>` | Write one app’s `.env.platform.generated` |
-| `make render-env-all` | Render for every app in `services.yaml` |
-| `make verify-schema` | Check schemas exist in Postgres |
-| `make doctor` | Platform health + wired-app env freshness |
-| `make down` | Stop platform containers |
+**Stack ports** (host → container):
 
-Set **`PRAAM_USE_PLATFORM=0`** in any product Makefile to use that repo’s own Postgres/Redis (escape hatch for CI or debugging).
+| Service | Port | Docker hostname |
+|---------|------|-----------------|
+| Postgres | 15430 | `postgres:5432` |
+| Redis | 16380 | `redis:6379` |
+| LiteLLM | 3100 | `litellm:4000` |
+| platform-config | 3180 | `platform-config:8080` |
 
-## Wired apps
+Schemas: `findoc`, `knowledge_studio`, `prism`, `askhr`, `plan_copilot`, `pulse`.
 
-| App | Notes |
-|-----|--------|
-| [findoc-ai](https://github.com/praamai/findoc-ai) | Host runtime; `make migrate` |
-| [praam-knowledge-studio](https://github.com/praamai/praam-knowledge-studio) | Docker + `praam-network`; `make db-init` once, then `make up` |
-| Others | `render-env` works; full platform migration pending — see [docs/SCHEMA_MIGRATIONS.md](docs/SCHEMA_MIGRATIONS.md) |
+`LEGACY_RENDER_ENV=1 make up` only if you still need `.env.platform.generated` in sibling repos.
 
-## Repo layout
+## App config (preferred)
+
+Two bootstrap vars, everything else from the API:
+
+```python
+from praam_platform import PlatformClient
+PlatformClient("findoc-ai").load()
+```
+
+```bash
+export PRAAM_CONFIG_URL=http://127.0.0.1:3180
+export PRAAM_SERVICE_TOKEN=praam-platform-dev
+curl http://127.0.0.1:3180/v1/apps/findoc-ai/config
+```
+
+Details: [docs/CONFIG_API.md](docs/CONFIG_API.md). Legacy fallback: `make render-env APP=findoc-ai`.
+
+**Sync SDK to siblings:** `make sdk` copies `lib/praam_platform` (+ built TS package) into wired app repos. See [sdk/README.md](sdk/README.md).
+
+## Security — no env files in app repos
+
+**Do not keep `.env.platform.generated` in product repos** if you can avoid it. Those files sit on disk inside each app and can be copied or committed by mistake.
+
+| What | Where it lives | In app repo? |
+|------|----------------|--------------|
+| `OPENAI_API_KEY` etc. | `~/.praam/secrets.env` | **No** — fetched via secrets API + token |
+| DB URL, Redis, LiteLLM gateway | Config API at runtime | **No** — `PlatformClient.load()` applies to process memory only |
+| Legacy `.env.platform.generated` | Sibling repo on disk | **Yes — avoid** (contains dev DB password + `LITELLM_MASTER_KEY`) |
+
+Apps should only need **two bootstrap vars** (or defaults). Remove leftover legacy files:
+
+```bash
+make clean-legacy-env   # deletes .env.platform.generated from all siblings
+```
+
+Ensure each app repo gitignores `.env.platform.generated` and never commits it.
+
+## Sibling apps
+
+**Platform-wired:** findoc-ai, knowledge-studio, askhr — include `make/v1/platform.mk`, set `PRAAM_USE_PLATFORM=1`.
+
+**Registered, wiring pending:** prism, production-plan-copilot, praam-pulse. **Shell:** demo-hub (:3000). Full list in [`services.yaml`](services.yaml). Status: [docs/STATUS.md](docs/STATUS.md).
+
+Product repos: Docker apps use `postgres`/`redis`/`litellm` on `praam-network`; host apps use `127.0.0.1:15430`, `:16380`, `:3100`.
+
+## Commands
+
+Run `make help` for the full list. Common:
+
+`bootstrap` · `up` · `down` · `check` (no Docker) · `doctor` · `backup-db` · `sdk` · `render-env`
+
+Clone siblings next to this repo; override with `PRAAM_PLATFORM_ROOT=/path/to/praam-platform`.
+
+## Layout
 
 ```text
-praam-platform/
-├── services.yaml              # registry: ports, schemas, redis, deps
-├── docker-compose.yml
-├── config/litellm.yaml          # model aliases: fast, reasoning, embedding
-├── infra/postgres/init/        # CREATE SCHEMA only (no app tables)
-├── make/v1/platform.mk         # stable API — pin PRAAM_PLATFORM_API=v1
-├── scripts/v1/                 # render-env, doctor, verify-schema
-└── docs/
-    ├── PLATFORM_PLAN.md        # architecture
-    └── SCHEMA_MIGRATIONS.md    # per-app rollout order
+services.yaml          lib/praam_platform/     services/platform-config/
+pyproject.toml · uv.lock   sdk/typescript/       config/litellm.yaml
+docker-compose.yml     make/v1/platform.mk       scripts/v1/
+infra/postgres/init/
 ```
 
-## Clone layout
-
-```text
-~/dev/github/
-├── praam-platform/       ← this repo
-├── praam-demo-hub/
-├── findoc-ai/
-├── praam-knowledge-studio/
-└── ...
-```
-
-Override path: `PRAAM_PLATFORM_ROOT=/path/to/praam-platform`
-
-## Docs
-
-| Doc | Purpose |
-|-----|---------|
-| [docs/PLATFORM_PLAN.md](docs/PLATFORM_PLAN.md) | Approved architecture and phases |
-| [docs/SCHEMA_MIGRATIONS.md](docs/SCHEMA_MIGRATIONS.md) | Who owns schemas vs Alembic |
-
-## Future (not in Phase 1)
-
-Ollama, Prometheus/Grafana, Python/TypeScript SDK reading `services.yaml`, Kubernetes manifests.
+Docs: [CONFIG_API](docs/CONFIG_API.md) · [STATUS](docs/STATUS.md) · [PLATFORM_PLAN](docs/PLATFORM_PLAN.md) · [SCHEMA_MIGRATIONS](docs/SCHEMA_MIGRATIONS.md) · [AGENTS.md](AGENTS.md)

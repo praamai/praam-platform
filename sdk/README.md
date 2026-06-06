@@ -1,10 +1,38 @@
-# praam-platform SDK (reserved)
+# praam-platform SDK
 
-Phase 1 uses shell scripts (`scripts/v1/render-env.sh`) and `services.yaml`.
+Runtime config and secrets via **platform-config API** (AWS Secrets Manager pattern).
 
-Future packages will read the same registry:
+## Python (uv)
 
-- **Python:** `from praam_platform import get_database_url, get_litellm_url, get_redis_url`
-- **TypeScript:** `getDatabaseUrl()`, `getLitellmUrl()`, `getRedisUrl()`
+From **praam-platform** root:
 
-Not implemented in Phase 1.
+```bash
+uv sync --all-extras
+uv run python -c "from praam_platform import PlatformClient; PlatformClient('findoc-ai').load()"
+```
+
+## TypeScript
+
+```bash
+cd sdk/typescript && npm install && npm run build
+```
+
+```typescript
+import { PlatformClient } from "@praam/platform";
+
+const loaded = await PlatformClient.load("findoc-ai");
+console.log(loaded.config.postgres?.url);
+```
+
+## Bootstrap env (only these)
+
+| Variable | Purpose |
+|----------|---------|
+| `PRAAM_CONFIG_URL` | Config API base (default `http://127.0.0.1:3180`) |
+| `PRAAM_SERVICE_TOKEN` | Bearer token for secrets API (dev: `praam-platform-dev`) |
+
+Everything else — DB, Redis, LiteLLM, ports — is fetched at startup.
+
+See [docs/CONFIG_API.md](../docs/CONFIG_API.md).
+
+Legacy `make render-env` still works as a fallback.

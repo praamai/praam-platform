@@ -17,12 +17,33 @@ platform:
     container_port: 4000
     container_host: litellm
     path: /v1
+    master_key: praam-litellm-dev
     models:
       fast: gpt-4o-mini
       reasoning: gpt-4o
       embedding: text-embedding-3-large
     providers:
       default: openai
+  config_api:
+    host_port: 3180
+    container_port: 8080
+    container_host: platform-config
+
+secrets:
+  backend: local
+  providers:
+    openai-api-key:
+      local_key: OPENAI_API_KEY
+    anthropic-api-key:
+      local_key: ANTHROPIC_API_KEY
+    gemini-api-key:
+      local_key: GEMINI_API_KEY
+  aws_arns: {}
+
+sdk:
+  sync_apps: wired
+  python_relpath: vendor/praam_platform
+  typescript_relpath: vendor/@praam/platform
 
 apps:
   findoc-ai:

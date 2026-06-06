@@ -16,7 +16,7 @@ if [ "$#" -lt 1 ]; then
 fi
 
 if ! python3 -c "import yaml" >/dev/null 2>&1; then
-  echo "ERROR: PyYAML not installed. Run: python3 -m pip install pyyaml"
+  echo "ERROR: PyYAML not installed. Run: make install-dev  (or: uv sync --all-extras)"
   exit 1
 fi
 

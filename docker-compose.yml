@@ -42,8 +42,6 @@ services:
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-praam-litellm-dev}
     env_file:
-      - path: .env
-        required: false
       - path: ${PRAAM_SECRETS_FILE:-${HOME}/.praam/secrets.env}
         required: false
     volumes:
@@ -54,11 +52,41 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health/liveliness >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness')\""]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 20s
+    networks:
+      - praam-network
+
+  platform-config:
+    build:
+      context: .
+      dockerfile: services/platform-config/Dockerfile
+    container_name: praam-platform-config
+    environment:
+      PRAAM_PLATFORM_ROOT: /app
+      PRAAM_SERVICE_TOKEN: ${PRAAM_SERVICE_TOKEN:-praam-platform-dev}
+      PRAAM_SECRETS_FILE: /run/secrets/praam-secrets.env
+      LOG_JSON: "true"
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_MAX: "120"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+    volumes:
+      - ./services.yaml:/app/services.yaml:ro
+      - ${PRAAM_SECRETS_FILE:-${HOME}/.praam/secrets.env}:/run/secrets/praam-secrets.env:ro
+    ports:
+      - "3180:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health/live')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     networks:
       - praam-network
 

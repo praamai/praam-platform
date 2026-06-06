@@ -1,7 +1,7 @@
 # praam-platform — Phase 1 implementation plan
 
-**Status:** Approved for implementation (Architecture grade: A)  
-**Last updated:** 2026-06-03
+**Status:** Platform complete (v1.1 — config API + SDK)  
+**Last updated:** 2026-06-06
 
 ## Final decision
 
@@ -17,13 +17,21 @@ Remaining risk is **execution discipline** (ordered schema migration PRs across 
 | 2 | **Named Redis roles** — `redis.cache`, `redis.celery`, etc. in `services.yaml` | `redis_db: [0, 1]` arrays |
 | 3 | **Service metadata** — `type`, `health`, `dependencies` per app in `services.yaml` | ports-only entries |
 
-### Reserved now, implement later
+### Shipped in platform repo
+
+| Item | Status |
+|------|--------|
+| `platform-config` API (`:3180`) | Shipped |
+| `lib/praam_platform` + Python/TS SDK | Shipped |
+| Secrets API (local file + AWS backend) | Shipped |
+| `make verify-schema` in platform + hook from `platform-wait` | Shipped |
+| LiteLLM model aliases | Shipped |
+| Legacy `render-env` | Shipped (fallback) |
+
+### Later phases (not this repo)
 
 | Item | Phase |
 |------|-------|
-| `sdk/python/`, `sdk/typescript/` (README + namespace only) | Post–Phase 1 |
-| `make verify-schema` in platform + hook from `platform-wait` | Phase 1 |
-| LiteLLM **model aliases** (`fast`, `reasoning`, `embedding`) in `config/litellm.yaml` | Phase 1 |
 | Prometheus / Grafana / Tempo | Phase 3 |
 | Ollama + model cache | Phase 2 |
 | K8s / Helm | Phase 4 |
@@ -33,13 +41,13 @@ Remaining risk is **execution discipline** (ordered schema migration PRs across 
 ## Layer model (evolution path)
 
 ```text
-praam-platform (today → future)
-├── postgres + redis + litellm     [Phase 1]
-├── services.yaml (platform API)   [Phase 1]
-├── make/v1 + render-env + doctor  [Phase 1]
-├── verify-schema                  [Phase 1]
-├── sdk/python + sdk/typescript    [reserved]
-├── secrets (~/.praam/secrets.env) [Phase 1]
+praam-platform (shipped)
+├── postgres + redis + litellm + platform-config API
+├── services.yaml (registry)
+├── lib/praam_platform + sdk/python + sdk/typescript
+├── make/v1 + doctor + verify-schema + config-smoke
+├── secrets (~/.praam/secrets.env) + AWS SM backend
+├── legacy render-env (fallback)
 ├── ollama + model cache           [Phase 2]
 ├── prometheus + grafana + tempo   [Phase 3]
 └── kubernetes / helm              [Phase 4]
@@ -263,14 +271,17 @@ PRAAM_PLATFORM_API ?= v1
 
 ---
 
-## Platform SDK (reserved)
+## Platform SDK
 
 ```text
-sdk/python/     # future: from praam_platform import get_database_url
-sdk/typescript/ # future: getDatabaseUrl(), getLitellmUrl()
+lib/praam_platform/           # shared registry + PlatformClient
+sdk/python/                   # uv sync --all-extras (see root pyproject.toml)
+sdk/typescript/               # npm run build in sdk/typescript
 ```
 
-Phase 1 uses `render-env.sh` only.
+Apps call `PlatformClient(app).load()` at startup — see [CONFIG_API.md](CONFIG_API.md).
+
+Phase 1 also supports legacy `render-env.sh` for apps not yet migrated.
 
 ---
 
@@ -293,7 +304,7 @@ praam-platform/
 ├── docs/
 │   ├── PLATFORM_PLAN.md    # this file
 │   └── SCHEMA_MIGRATIONS.md
-├── .env.secrets.example
+├── .env.example
 └── README.md
 ```
 
@@ -322,12 +333,23 @@ make up  →  doctor (optional)  →  platform-ensure  →  platform-wait
 
 ## Implementation checklist
 
-- [ ] `platform-repo-v1` — compose, schemas, litellm, services.yaml, make/v1, doctor, verify-schema
-- [ ] `render-env-generated` — `.env.platform.generated` + gitignore in apps
+### Platform repo (complete)
+
+- [x] `platform-repo-v1` — compose, schemas, litellm, services.yaml, make/v1, doctor, verify-schema
+- [x] `platform-config-api` — FastAPI on :3180, secrets local + AWS
+- [x] `sdk-python-typescript` — PlatformClient, tests, docs
+- [x] `render-env-generated` — legacy fallback; apps migrate to SDK
+- [x] `verify-platform-ci` — unit + Docker integration in `.github/workflows/ci.yml`
+- [x] `bootstrap` — `make bootstrap`, `.env.example`, AGENTS.md
+
+### Sibling repos (deferred — do after platform)
+
 - [ ] `hub-delegate` — hub suite; no `sync-platform-env.sh`
-- [ ] `findoc-proof` — end-to-end host runtime
-- [ ] `sibling-rollout` — compose network + Alembic per SCHEMA_MIGRATIONS.md
-- [ ] `verify-suite-ci` — PRAAM_USE_PLATFORM 0/1
+- [ ] `findoc-proof` — end-to-end host runtime (mostly done; gateway-only LLM pending)
+- [ ] `sibling-rollout` — compose network + Alembic per [SCHEMA_MIGRATIONS.md](SCHEMA_MIGRATIONS.md)
+- [ ] `verify-suite-ci` — PRAAM_USE_PLATFORM 0/1 across cloned suite
+
+See [STATUS.md](STATUS.md) for current platform vs sibling status.
 
 ---
 

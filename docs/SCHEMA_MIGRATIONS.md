@@ -1,29 +1,34 @@
 # Schema migrations across the Praam suite
 
-**Platform owns:** database `praam_dev`, schema creation, `vector` extension, grants.  
-**Apps own:** tables, indexes, Alembic revisions inside their schema.
+**Platform owns:** database `praam_dev`, schema creation, `vector` extension, grants, `render-env`, `verify-schema`.  
+**Apps own:** tables, indexes, Alembic revisions inside their schema, Makefile wiring, `.env.platform.generated` load order.
 
 Init SQL lives in `infra/postgres/init/01-schemas.sql` — never add app tables there.
 
+> **Platform Phase 1 is complete in `praam-platform`.** The table below tracks **sibling repo** rollout only.
+
 ## Schema map
 
-| Schema | App repo | Status |
-|--------|----------|--------|
+| Schema | App repo | Sibling rollout |
+|--------|----------|-----------------|
 | `findoc` | findoc-ai | Done — SQLAlchemy `create_all` + search_path |
-| `knowledge_studio` | praam-knowledge-studio | Done — `make db-init` applies `schema.sql`; `make migrate-legacy-users` copies accounts from legacy `:15431` |
-| `prism` | prism | Pending |
+| `knowledge_studio` | praam-knowledge-studio | Done — `make db-init` applies `schema.sql` |
 | `askhr` | askHR | Done — platform compose + `render-env`; tables via API `init_db()` |
-| `plan_copilot` | production-plan-copilot | Pending |
-| `pulse` | praam-pulse | Pending |
+| `prism` | prism | Pending |
+| `plan_copilot` | production-plan-copilot | Pending — partial `platform.mk` wiring |
+| `pulse` | praam-pulse | Pending — partial `platform.mk` wiring |
 
 ## Migration order (sibling PRs)
 
-1. **findoc-ai** — host runtime, `.env.platform.generated`, `PRAAM_USE_PLATFORM=1` ✓
-2. **praam-demo-hub** — suite calls platform before sibling `make up` ✓
-3. **praam-knowledge-studio** — docker runtime, `praam-network`, `make db-init` ✓
-4. **prism**, **askHR**, **production-plan-copilot**, **praam-pulse** — pending
+1. **findoc-ai** ✓
+2. **praam-demo-hub** ✓
+3. **praam-knowledge-studio** ✓
+4. **askHR** ✓
+5. **production-plan-copilot**, **praam-pulse**, **prism** — pending
 
-## Per-app checklist
+## Per-app checklist (sibling repos)
+
+Apply in each product repo when wiring to the platform:
 
 - [ ] Add `-include $(PRAAM_PLATFORM_ROOT)/make/v1/platform.mk` to Makefile
 - [ ] Gitignore `.env.platform.generated`
@@ -31,6 +36,7 @@ Init SQL lives in `infra/postgres/init/01-schemas.sql` — never add app tables 
 - [ ] `make render-env` before `make up` when `PRAAM_USE_PLATFORM=1`
 - [ ] Alembic `version_table_schema` = app schema (or equivalent isolation)
 - [ ] `PRAAM_USE_PLATFORM=0` escape hatch still works in CI
+- [ ] Set `platform_wired: true` in `services.yaml` when doctor env checks should apply
 
 ## Connection string pattern
 

@@ -1,0 +1,50 @@
+---
+description: Praam suite 13-layer stack — boundaries, ownership, platform v1.1 complete
+alwaysApply: true
+---
+
+# Praam suite — 13-layer stack
+
+Layers are **concerns**, not deployables. Do not invent a 13th container or repo per layer.
+
+| # | Layer | Owner | Notes |
+|---|--------|--------|--------|
+| 1 | Product UI | Each product repo | findoc, studio, prism, askHR, … |
+| 2 | Product API | Each product repo | FastAPI / Node |
+| 3 | Product domain | Each product repo | Business logic |
+| 4 | Product data | Each product repo | Alembic / init in **own schema** on `praam_dev` |
+| 5 | Suite identity | **praam-pulse** | JWT issuer — **not** praam-platform |
+| 6 | Suite watch / events | **praam-pulse** | catalog, security_events, Raphael forward |
+| 7 | Config registry | **praam-platform** | `services.yaml` |
+| 8 | Config + secrets API | **praam-platform** | `platform-config` `:3180` |
+| 9 | Platform SDK | **praam-platform** | `PlatformClient` — Python + TS |
+| 10 | Shared Postgres | **praam-platform** | `praam_dev`, schema-per-app, pgvector |
+| 11 | Shared Redis | **praam-platform** | named logical DB indexes |
+| 12 | LLM gateway | **praam-platform** | LiteLLM; keys in `~/.praam/secrets.env` only |
+| 13 | Dev orchestration | platform + demo-hub | `make/v1`, doctor, CI, suite `make all` |
+
+## praam-platform scope (layers 7–12 + 13 partial)
+
+**v1.1 is implementation-complete in this repo.** Do not add product tables, human login, or app secrets to platform.
+
+Apps bootstrap with **only** `PRAAM_CONFIG_URL` + `PRAAM_SERVICE_TOKEN`; fetch everything else via SDK/API:
+
+```python
+from praam_platform import PlatformClient
+PlatformClient("findoc-ai").load()
+```
+
+Legacy `render-env` → `.env.platform.generated` is fallback only.
+
+## Remaining work is **outside** this repo
+
+- Sibling apps: adopt `PlatformClient`, drop hand-edited infra env
+- Wire prism, plan-copilot, pulse to platform
+- Phase 2–4: Ollama, Prometheus, K8s — not v1.1 blockers
+
+## Anti-patterns
+
+- Moving suite auth (layer 5) into praam-platform
+- Per-app DB/Redis/LLM keys in product `.env` when platform-wired
+- Mutating sibling `.env` from platform scripts
+- Treating 13 layers as 13 microservices locally
